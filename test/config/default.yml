@@ -1,0 +1,9 @@
+anchor:
+  sizes: [40, 60]
+  ratios: [[1.0, 1.0], [1.0, 1.5]]
+
+train:
+  epoch: 80
+  max_iou: 0.5
+  min_iou: 0.1
+  max_num_boxes: 100

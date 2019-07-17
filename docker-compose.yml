@@ -1,0 +1,11 @@
+version: '3'
+services:
+  train:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/project
+      - /run/media/hongzio/14BC2BADBC2B87F6/data/osstem-frcnn:/data
+    working_dir: /project
+    tty: true
