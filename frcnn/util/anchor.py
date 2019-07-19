@@ -47,6 +47,29 @@ def broadcast_iou(ref_box, anchor_box):
     return int_area / (ref_box_area + anchor_box_area - int_area + 1e-6)
 
 
+
+def regress_to_coord(regress, anchors):
+    N, H, W, A = tf.cast(tf.shape(regress), tf.float32)
+    anchors_coord = make_anchor_coords(H, W, anchors)
+    anchors_coord = tf.expand_dims(anchors_coord, axis=0)
+    anchors_coord = tf.tile(anchors_coord, (N, 1, 1, 1, 1))
+    anchor_center_y = (anchors_coord[..., 0] + anchors_coord[..., 2]) / 2
+    anchor_center_x = (anchors_coord[..., 1] + anchors_coord[..., 3]) / 2
+    anchor_h = anchors_coord[..., 2] - anchors_coord[..., 0]
+    anchor_w = anchors_coord[..., 3] - anchors_coord[..., 1]
+
+    regress = tf.reshape(regress, tf.shape(anchors_coord))
+
+    anchor_new_y = regress[..., 0] * anchor_h + anchor_center_y
+    anchor_new_x = regress[..., 1] * anchor_w + anchor_center_x
+    anchor_new_h = tf.math.exp(regress[..., 2]) * anchor_h
+    anchor_new_w = tf.math.exp(regress[..., 3]) * anchor_w
+    coords = tf.stack([anchor_new_y - anchor_new_h / 2,
+                       anchor_new_x - anchor_new_w / 2,
+                       anchor_new_y + anchor_new_h / 2,
+                       anchor_new_x + anchor_new_w / 2], axis=-1)
+    return coords
+
 def transform(bboxes, anchors, output_sizes, min_iou, max_iou, max_num_boxes=100):
     # Padding bboxes
     paddings = [[0, max_num_boxes - tf.shape(bboxes)[0]],
@@ -57,15 +80,7 @@ def transform(bboxes, anchors, output_sizes, min_iou, max_iou, max_num_boxes=100
         # anchors' coordinate
         H = tf.cast(output_size[0], tf.float32)
         W = tf.cast(output_size[1], tf.float32)
-        y_center, x_center = tf.meshgrid(tf.range(H), tf.range(W), indexing='ij')
-        anchors_y = anchor_coords_along(Y, y_center, anchors)
-        anchors_y_ratio = anchors_y / H
-        anchors_x = anchor_coords_along(X, x_center, anchors)
-        anchors_x_ratio = anchors_x / W
-        anchors_coord = tf.concat([anchors_y_ratio[..., 0:1],
-                                   anchors_x_ratio[..., 0:1],
-                                   anchors_y_ratio[..., 1:2],
-                                   anchors_x_ratio[..., 1:2]], axis=-1)
+        anchors_coord = make_anchor_coords(H, W, anchors)
         anchors_coord_per_bbox = tf.expand_dims(anchors_coord, axis=-2)  # bboxes
         anchors_coord_per_bbox = tf.tile(anchors_coord_per_bbox, [1, 1, 1, max_num_boxes, 1])
 
@@ -114,4 +129,17 @@ def transform(bboxes, anchors, output_sizes, min_iou, max_iou, max_num_boxes=100
 
         y = tf.concat([valid, overlap, regress], axis=-1)
         ys.append(y)
-    return tuple(ys)
+    return tuple(ys), bboxes
+
+
+def make_anchor_coords(H, W, anchors):
+    y_center, x_center = tf.meshgrid(tf.range(H), tf.range(W), indexing='ij')
+    anchors_y = anchor_coords_along(Y, y_center, anchors)
+    anchors_y_ratio = anchors_y / H
+    anchors_x = anchor_coords_along(X, x_center, anchors)
+    anchors_x_ratio = anchors_x / W
+    anchors_coord = tf.concat([anchors_y_ratio[..., 0:1],
+                               anchors_x_ratio[..., 0:1],
+                               anchors_y_ratio[..., 1:2],
+                               anchors_x_ratio[..., 1:2]], axis=-1)
+    return anchors_coord

@@ -1,7 +1,6 @@
 import tensorflow as tf
 
-
-class RPN(tf.keras.models.Model):
+class RPN(tf.keras.layers.Layer):
     def __init__(self, num_anchors, backbone, **kwargs):
         super().__init__(**kwargs)
         self.backbone = backbone(name='backbone')

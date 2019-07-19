@@ -1,9 +1,15 @@
 anchor:
   sizes: [3, 6, 9]
   ratios: [[1.0, 1.0], [1.0, 1.5], [1.5, 1.0]]
+data:
+  num_classes: 100
 
 train:
   epoch: 80
   max_iou: 0.7
   min_iou: 0.3
-  max_num_boxes: 100
+  max_num_gt_boxes: 100
+  max_num_rois: 300
+  batch_size: 2
+  roi_size: 7
+  roi_overlap_threshold: 0.7
