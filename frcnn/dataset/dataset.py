@@ -1,9 +1,10 @@
 import tensorflow as tf
-
+import os
 
 def fake_dataset():
-    girl = tf.image.decode_png(open('tests/data/girl.png', 'rb').read(), channels=3)
-    horse = tf.image.decode_jpeg(open('tests/data/horse.jpg', 'rb').read(), channels=3)
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+    girl = tf.image.decode_png(open(os.path.join(src_dir, 'girl.png'), 'rb').read(), channels=3)
+    horse = tf.image.decode_jpeg(open(os.path.join(src_dir, 'horse.jpg'), 'rb').read(), channels=3)
 
     # y1, x1, y2, x2, cls
     girl_bb = tf.convert_to_tensor([[0.03049111, 0.18494931, 0.96302897, 0.9435849, 0],
