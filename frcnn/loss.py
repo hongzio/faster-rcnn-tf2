@@ -35,7 +35,29 @@ def rpn_loss(y_true, rpn_out):
     rpn_regress_pred = tf.reshape(rpn_out[1], y_true[..., 2:].shape)
     rpn_regress_loss = tf.math.square(y_true[..., 2:] - rpn_regress_pred)
 
-    tiled_overlap_mask = tf.reshape(tf.tile(tf.reshape(overlap_mask, (-1, 1)), (1, tf.shape(rpn_regress_loss)[-1])),
-                                    tf.shape(rpn_regress_loss))
-    rpn_regress_loss = tf.math.reduce_sum(tiled_overlap_mask * rpn_regress_loss) / tf.math.reduce_sum(tiled_overlap_mask + eps)
+    tiled_train_mask = tf.tile(tf.expand_dims(train_mask, axis=-1), (1, 1, 1, 1, 4))
+    rpn_regress_loss = tf.math.reduce_sum(tiled_train_mask * rpn_regress_loss) / tf.math.reduce_sum(tiled_train_mask + eps)
     return rpn_obj_loss + rpn_regress_loss
+
+
+def roi_loss(y_true, y_pred, num_classes):
+    is_valid = y_true[..., 0]
+    true_regr = y_true[..., 1:5]
+    true_cls = y_true[..., 5:]
+
+    pred_cls = y_pred[0] # (None, num_classes+1)
+    pred_regr = y_pred[1] # (None, num_classes)
+    pred_regr = tf.reshape(pred_regr, (tf.shape(pred_regr)[0], -1, num_classes, 4))
+
+    cls_loss = tf.losses.categorical_crossentropy(true_cls, pred_cls)
+
+    mask = true_cls[..., :-1]
+    mask = tf.expand_dims(mask, axis=-1)
+    mask = tf.tile(mask, (1, 1, 1, 4))
+
+    true_regr = tf.expand_dims(true_regr, axis=2)
+    true_regr = tf.tile(true_regr, (1, 1, num_classes, 1))
+
+    regr_loss = tf.math.square(true_regr - pred_regr) * mask
+
+    return tf.reduce_sum(cls_loss) + tf.reduce_sum(regr_loss)

@@ -37,21 +37,18 @@ class FasterRCNN:
                                                                         self.config['train']['max_num_gt_boxes'])))
         self.dataset = dataset.batch(self.config['train']['batch_size'])
 
+    # @tf.function
+    def _train_step(self, x, rpn_y, gt_boxes):
+        with tf.GradientTape() as tape:
+            self.model(x, rpn_y, gt_boxes)
+            losses = self.model.losses
+        gradient = tape.gradient(losses, self.model.trainable_variables)
+        self.rpn_optimizer.apply_gradients(zip(gradient, self.model.trainable_variables))
+        return tf.reduce_sum(losses)
+
     def train(self):
         self.init_train_context()
-
-        # @tf.function
-        def train_step(x, rpn_y, gt_boxes):
-            losses = []
-            with tf.GradientTape() as tape:
-                preds = self.model(x, rpn_y, gt_boxes)
-                for y, pred in zip(rpn_y, preds):
-                    losses.append(rpn_loss(y, pred))
-            gradient = tape.gradient(losses, self.model.trainable_variables)
-            self.rpn_optimizer.apply_gradients(zip(gradient, self.model.trainable_variables))
-            return tf.reduce_sum(losses)
-
-        for epoch in range(100):
+        for epoch in range(1):
             for step, (x, (rpn_y, gt_boxes)) in enumerate(self.dataset):
-                loss = train_step(x, rpn_y, gt_boxes)
+                loss = self._train_step(x, rpn_y, gt_boxes)
                 print(loss.numpy())

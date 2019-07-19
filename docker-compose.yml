@@ -5,7 +5,6 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - .:/project
-      - /run/media/hongzio/14BC2BADBC2B87F6/data/osstem-frcnn:/data
-    working_dir: /project
+      - .:/opt/project
+    working_dir: /opt/project
     tty: true

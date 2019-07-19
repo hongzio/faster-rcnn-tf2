@@ -10,6 +10,6 @@ train:
   min_iou: 0.3
   max_num_gt_boxes: 100
   max_num_rois: 300
-  batch_size: 2
+  batch_size: 1
   roi_size: 7
   roi_overlap_threshold: 0.7

@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from frcnn.loss import rpn_loss
+from frcnn.loss import rpn_loss, roi_loss
 from frcnn.network.classifier import RoiClassifier
 from frcnn.network.rpn import RPN
 from frcnn.util.anchor import regress_to_coord, broadcast_iou
@@ -87,15 +87,12 @@ class FasterRCNNModel(tf.keras.models.Model):
                 y = tf.concat([tf.expand_dims(is_valid, axis=-1), y], axis=1)
                 rois.append(roi)
                 ys.append(y)
-        return rois, ys
+        return tf.convert_to_tensor(rois), tf.convert_to_tensor(ys)
 
     def call(self, x, rpn_y, gt_boxes, **kwargs):
         rpn_outs = self.rpn(x)
         for y, rpn_out in zip(rpn_y, rpn_outs):
             self.add_loss(rpn_loss(y, rpn_out))
         rois, roi_y = self._roi_align(rpn_outs, gt_boxes)
-        for roi, y in zip(rois, roi_y):
-            roi_out = self.classifier(roi)
-            print(roi_out[0].shape)
-            print(roi_out[1].shape)
-        return rpn_outs
+        roi_out = self.classifier(rois)
+        self.add_loss(roi_loss(roi_y, roi_out, self.num_classes))
