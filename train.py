@@ -1,5 +1,5 @@
 from frcnn.faster_rcnn import FasterRCNN
-from frcnn.util.config import Config
+from frcnn.config import Config
 
 if __name__ == '__main__':
     cfg = Config()

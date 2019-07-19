@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from frcnn.util.anchor import make_anchors, broadcast_iou, transform
-from frcnn.util.config import Config
+from frcnn.config.config import Config
 
 
 class TestAnchor(unittest.TestCase):
