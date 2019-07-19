@@ -15,8 +15,8 @@ def _hard_negative_sampling(losses, valid_mask, overlap_mask):
     ret = tf.tensor_scatter_nd_update(ret, neg_sample_idx[:neg_cnt], tf.ones((neg_cnt, )))
     return ret
 
+eps = 1e-6
 def rpn_loss(y_true, rpn_out):
-    eps = 1e-6
     valid_mask = y_true[..., 0]
     overlap_mask = y_true[..., 1]
 
@@ -49,15 +49,17 @@ def roi_loss(y_true, y_pred, num_classes):
     pred_regr = y_pred[1] # (None, num_classes)
     pred_regr = tf.reshape(pred_regr, (tf.shape(pred_regr)[0], -1, num_classes, 4))
 
-    cls_loss = tf.losses.categorical_crossentropy(true_cls, pred_cls)
-
     mask = true_cls[..., :-1]
     mask = tf.expand_dims(mask, axis=-1)
     mask = tf.tile(mask, (1, 1, 1, 4))
+    mask = tf.zeros_like(mask)
 
     true_regr = tf.expand_dims(true_regr, axis=2)
     true_regr = tf.tile(true_regr, (1, 1, num_classes, 1))
 
-    regr_loss = tf.math.square(true_regr - pred_regr) * mask
+    cls_loss = tf.losses.categorical_crossentropy(true_cls, pred_cls)
+    cls_loss = tf.reduce_sum(cls_loss) / tf.reduce_sum(mask + eps)
+
+    regr_loss = tf.reduce_sum(tf.math.square(true_regr - pred_regr) * mask) / tf.reduce_sum(mask + eps)
 
     return tf.reduce_sum(cls_loss) + tf.reduce_sum(regr_loss)

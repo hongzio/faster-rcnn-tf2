@@ -49,7 +49,10 @@ def broadcast_iou(ref_box, anchor_box):
 
 
 def regress_to_coord(regress, anchors):
-    N, H, W, A = tf.cast(tf.shape(regress), tf.float32)
+    regress_shape = tf.cast(tf.shape(regress), tf.float32)
+    N = regress_shape[0]
+    H = regress_shape[1]
+    W = regress_shape[2]
     anchors_coord = make_anchor_coords(H, W, anchors)
     anchors_coord = tf.expand_dims(anchors_coord, axis=0)
     anchors_coord = tf.tile(anchors_coord, (N, 1, 1, 1, 1))
