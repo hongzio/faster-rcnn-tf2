@@ -21,9 +21,6 @@ class FasterRCNNModel(tf.keras.models.Model):
         self.num_classes = num_classes
         self.rpn = RPN(len(anchors), backbone)
         self.classifier = RoiClassifier(self.num_classes)
-        self.rpn_optimizer = tf.keras.optimizers.Adam(1e-4)
-        self.roi_optimizer = tf.keras.optimizers.Adam(1e-4)
-        self.total_loss = tf.Variable(0.0)
 
     def _calc_roi_target(self, pred_boxes, gt_boxes):
         tiled_pred_boxes = tf.expand_dims(pred_boxes, axis=1)
@@ -105,7 +102,6 @@ class FasterRCNNModel(tf.keras.models.Model):
         return tf.convert_to_tensor(rois), tf.convert_to_tensor(ys)
 
     def sample_rois(self, roi_xs, roi_ys):
-        # https://github.com/tensorflow/tensorflow/issues/26608
         not_bg = tf.not_equal(roi_ys[..., -1], 1)
         is_valid = tf.equal(roi_ys[..., 0], 1)
         is_pos = tf.logical_and(not_bg, is_valid)
@@ -116,39 +112,32 @@ class FasterRCNNModel(tf.keras.models.Model):
         neg_ys = tf.gather_nd(roi_ys, tf.where(is_neg))
         pos_cnt = tf.shape(pos_xs)[0]
         neg_cnt = tf.shape(neg_xs)[0]
-        random_idx = tf.random.shuffle(tf.expand_dims(tf.range(neg_cnt), axis=-1))
-        random_idx = random_idx[:pos_cnt]
-        neg_xs = tf.gather_nd(neg_xs, random_idx)
-        neg_ys = tf.gather_nd(neg_ys, random_idx)
+        # https://github.com/tensorflow/tensorflow/issues/26608
+        # random_idx = tf.random.shuffle(tf.expand_dims(tf.range(neg_cnt), axis=-1))
+        # random_idx = random_idx[:pos_cnt]
+        # neg_xs = tf.gather_nd(neg_xs, random_idx)
+        # neg_ys = tf.gather_nd(neg_ys, random_idx)
+        neg_xs = neg_xs[:pos_cnt]
+        neg_ys = neg_ys[:pos_cnt]
         ret_roi_xs = tf.concat([pos_xs, neg_xs], axis=0)
         ret_roi_ys = tf.concat([pos_ys, neg_ys], axis=0)
         return ret_roi_xs, ret_roi_ys
 
     def call(self, x, rpn_y, gt_boxes, **kwargs):
-        self.total_loss.assign(0.0)
-        with tf.GradientTape(persistent=True) as tape:
-            rpn_outs = self.rpn(x)
-            for y, rpn_out in zip(rpn_y, rpn_outs):
-                loss = rpn_loss(y, rpn_out)
-                self.total_loss.assign_add(loss)
-                if tf.equal(loss, 0):
-                    continue
-                with tape.stop_recording():
-                    grad = tape.gradient(loss, self.trainable_variables)
-                    self.rpn_optimizer.apply_gradients(zip(grad, self.trainable_variables))
-            roi_xs, roi_ys = self._roi_align(rpn_outs, gt_boxes)
-            roi_xs = tf.reshape(roi_xs, (-1, 7, 7, 512))
-            roi_ys = tf.reshape(roi_ys, (-1, 106))
-            roi_xs, roi_ys = self.sample_rois(roi_xs, roi_ys)
-            batch_size = 8
-            for i in range(0, tf.shape(roi_xs)[0], batch_size):
-                roi_x = roi_xs[i:i+batch_size]
-                roi_y = roi_ys[i:i+batch_size]
-                roi_pred = self.classifier(roi_x)
-                loss = roi_loss(roi_y, roi_pred, self.num_classes)
-                self.total_loss.assign_add(loss)
-                with tape.stop_recording():
-                    grad = tape.gradient(loss, self.trainable_variables)
-                    self.roi_optimizer.apply_gradients(zip(grad, self.trainable_variables))
-        del tape
-        return self.total_loss
+        losses = 0
+        rpn_outs = self.rpn(x)
+        for y, rpn_out in zip(rpn_y, rpn_outs):
+            loss = rpn_loss(y, rpn_out)
+            losses += loss
+        roi_xs, roi_ys = self._roi_align(rpn_outs, gt_boxes)
+        roi_xs = tf.reshape(roi_xs, (-1, 7, 7, 512))
+        roi_ys = tf.reshape(roi_ys, (-1, 106))
+        roi_xs, roi_ys = self.sample_rois(roi_xs, roi_ys)
+        batch_size = 8
+        for i in range(0, tf.shape(roi_xs)[0], batch_size):
+            roi_x = roi_xs[i:i+batch_size]
+            roi_y = roi_ys[i:i+batch_size]
+            roi_pred = self.classifier(roi_x)
+            loss = roi_loss(roi_y, roi_pred, self.num_classes)
+            losses += loss
+        return losses

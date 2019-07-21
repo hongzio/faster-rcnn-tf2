@@ -21,6 +21,7 @@ class FasterRCNN:
                                      )
         self.dataset = None
         self.train_loss = tf.keras.metrics.Mean(name='train_loss')
+        self.optimizer = tf.keras.optimizers.Adam(1e-4)
 
     def init_train_context(self):
         dataset = fake_dataset()
@@ -36,7 +37,11 @@ class FasterRCNN:
 
     @tf.function
     def _train_step(self, x, rpn_y, gt_boxes):
-        return self.model(x, rpn_y, gt_boxes)
+        with tf.GradientTape() as tape:
+            loss = self.model(x, rpn_y, gt_boxes)
+        grad = tape.gradient(loss, self.model.trainable_variables)
+        self.optimizer.apply_gradients(zip(grad, self.model.trainable_variables))
+        return loss
 
     def train(self):
         self.init_train_context()
