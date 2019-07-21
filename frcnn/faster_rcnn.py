@@ -46,7 +46,7 @@ class FasterRCNN:
 
     def train(self):
         self.init_train_context()
-        for epoch in range(10):
+        for epoch in range(1):
             for step, (x, (rpn_y, gt_boxes)) in enumerate(self.dataset):
                 loss = self._train_step(x, rpn_y, gt_boxes)
                 print(loss.numpy())

@@ -121,7 +121,7 @@ class FasterRCNNModel(tf.keras.models.Model):
             rois, roi_y = self._roi_align(rpn_outs, gt_boxes)
             rois = tf.reshape(rois, (-1, 7, 7, 512))
             roi_y = tf.reshape(roi_y, (-1, 106))
-            batch_size = 4
+            batch_size = 12
             for i in range(0, tf.shape(rois)[0], batch_size):
                 n_rois = rois[i:i+batch_size]
                 n_roi_y = roi_y[i:i+batch_size]
