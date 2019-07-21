@@ -19,13 +19,9 @@ class FasterRCNN:
                                      self.config['train']['roi_size'],
                                      self.config['train']['roi_overlap_threshold'],
                                      )
-        self.rpn_loss = None
         self.dataset = None
-        self.rpn_optimizer = None
 
     def init_train_context(self):
-        self.rpn_optimizer = tf.optimizers.Adam(lr=1e-4)
-        self.rpn_loss = rpn_loss
         dataset = fake_dataset()
         dataset = dataset.map(lambda image, gt_boxes: (tf.image.resize(image, (416, 416)), gt_boxes))
         dataset = dataset.map(lambda image, gt_boxes: (image, transform(gt_boxes,
@@ -39,7 +35,7 @@ class FasterRCNN:
 
     @tf.function
     def _train_step(self, x, rpn_y, gt_boxes):
-        self.model(x, rpn_y, gt_boxes, self.rpn_optimizer)
+        self.model(x, rpn_y, gt_boxes)
         return tf.reduce_sum(self.model.losses)
         # with tf.GradientTape(persistent=True) as tape:
         #     losses = self.model.losses

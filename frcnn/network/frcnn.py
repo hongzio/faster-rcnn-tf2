@@ -21,6 +21,8 @@ class FasterRCNNModel(tf.keras.models.Model):
         self.num_classes = num_classes
         self.rpn = RPN(len(anchors), backbone)
         self.classifier = RoiClassifier(self.num_classes)
+        self.rpn_optimizer = tf.keras.optimizers.Adam(1e-4)
+        self.roi_optimizer = tf.keras.optimizers.Adam(1e-4)
 
     def _calc_roi_target(self, pred_boxes, gt_boxes):
         tiled_pred_boxes = tf.expand_dims(pred_boxes, axis=1)
@@ -101,7 +103,7 @@ class FasterRCNNModel(tf.keras.models.Model):
                 ys.append(y)
         return tf.convert_to_tensor(rois), tf.convert_to_tensor(ys)
 
-    def call(self, x, rpn_y, gt_boxes, rpn_optimizer, **kwargs):
+    def call(self, x, rpn_y, gt_boxes, **kwargs):
         losses = tf.TensorArray(tf.float32, size=10, dynamic_size=True)
         idx = 0
         with tf.GradientTape(persistent=True) as tape:
@@ -115,20 +117,21 @@ class FasterRCNNModel(tf.keras.models.Model):
                     continue
                 with tape.stop_recording():
                     grad = tape.gradient(loss, self.trainable_variables)
-                    rpn_optimizer.apply_gradients(zip(grad, self.trainable_variables))
+                    self.rpn_optimizer.apply_gradients(zip(grad, self.trainable_variables))
             rois, roi_y = self._roi_align(rpn_outs, gt_boxes)
             rois = tf.reshape(rois, (-1, 7, 7, 512))
             roi_y = tf.reshape(roi_y, (-1, 106))
-            roi_dataset = tf.data.Dataset.from_tensor_slices((rois, roi_y))
-            roi_dataset = roi_dataset.batch(8)
-            for i, (rois, roi_y) in enumerate(roi_dataset):
-                roi_outs = self.classifier(rois)
-                loss = roi_loss(roi_y, roi_outs, self.num_classes)
+            batch_size = 4
+            for i in range(0, tf.shape(rois)[0], batch_size):
+                n_rois = rois[i:i+batch_size]
+                n_roi_y = roi_y[i:i+batch_size]
+                n_roi_outs = self.classifier(n_rois)
+                loss = roi_loss(n_roi_y, n_roi_outs, self.num_classes)
                 tf.print(i, loss)
                 losses.write(idx, loss)
                 idx+=1
                 with tape.stop_recording():
                     grad = tape.gradient(loss, self.trainable_variables)
-                    rpn_optimizer.apply_gradients(zip(grad, self.trainable_variables))
+                    self.roi_optimizer.apply_gradients(zip(grad, self.trainable_variables))
         del tape
         return losses
