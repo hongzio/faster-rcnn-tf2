@@ -37,7 +37,7 @@ class FasterRCNN:
                                                                         self.config['train']['max_num_gt_boxes'])))
         self.dataset = dataset.batch(self.config['train']['batch_size'])
 
-    # @tf.function
+    @tf.function
     def _train_step(self, x, rpn_y, gt_boxes):
         self.model(x, rpn_y, gt_boxes, self.rpn_optimizer)
         return tf.reduce_sum(self.model.losses)
