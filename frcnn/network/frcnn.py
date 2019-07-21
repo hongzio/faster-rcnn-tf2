@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import tensorflow as tf
 
 from frcnn.loss import rpn_loss, roi_loss
@@ -18,7 +20,7 @@ class FasterRCNNModel(tf.keras.models.Model):
         self.roi_overlap_threshold = roi_overlap_threshold
         self.num_classes = num_classes
         self.rpn = RPN(len(anchors), backbone)
-        self.classifier = tf.keras.layers.TimeDistributed(RoiClassifier(self.num_classes))
+        self.classifier = RoiClassifier(self.num_classes)
 
     def _calc_roi_target(self, pred_boxes, gt_boxes):
         tiled_pred_boxes = tf.expand_dims(pred_boxes, axis=1)
@@ -99,14 +101,20 @@ class FasterRCNNModel(tf.keras.models.Model):
                 ys.append(y)
         return tf.convert_to_tensor(rois), tf.convert_to_tensor(ys)
 
-    def call(self, x, rpn_y, gt_boxes, **kwargs):
-        rpn_outs = self.rpn(x)
-        for y, rpn_out in zip(rpn_y, rpn_outs):
-            self.add_loss(rpn_loss(y, rpn_out))
+    def call(self, x, rpn_y, gt_boxes, rpn_optimizer, **kwargs):
+        with tf.GradientTape() as tape:
+            rpn_outs = self.rpn(x)
+            for y, rpn_out in zip(rpn_y, rpn_outs):
+                self.add_loss(rpn_loss(y, rpn_out))
 
-        rois, roi_y = self._roi_align(rpn_outs, gt_boxes)
-        rois = rois[:, :3, :, :, :]
-        roi_outs = self.classifier(rois)
-        roi_y = roi_y[:, :3, :]
-        self.add_loss(roi_loss(roi_y, roi_outs, self.num_classes))
-        return rpn_outs, roi_outs
+            rois, roi_y = self._roi_align(rpn_outs, gt_boxes)
+            for i in range(tf.shape(rois)[1]):
+                t_rois = rois[:, i, :, :, :]
+                t_roi_y = roi_y[:, i, :]
+                t_roi_outs = self.classifier(t_rois)
+                loss = roi_loss(t_roi_y, t_roi_outs, self.num_classes)
+                with tape.stop_recording():
+                    grad = tape.gradient(loss, self.trainable_variables)
+                    rpn_optimizer.apply_gradients(zip(grad, self.trainable_variables))
+
+        return tf.reduce_sum(self.losses)

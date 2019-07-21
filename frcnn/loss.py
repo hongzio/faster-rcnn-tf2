@@ -47,15 +47,14 @@ def roi_loss(y_true, y_pred, num_classes):
 
     pred_cls = y_pred[0] # (None, num_classes+1)
     pred_regr = y_pred[1] # (None, num_classes)
-    pred_regr = tf.reshape(pred_regr, (tf.shape(pred_regr)[0], -1, num_classes, 4))
+    pred_regr = tf.reshape(pred_regr, (tf.shape(pred_regr)[0], num_classes, 4))
 
     mask = true_cls[..., :-1]
     mask = tf.expand_dims(mask, axis=-1)
-    mask = tf.tile(mask, (1, 1, 1, 4))
-    mask = tf.zeros_like(mask)
+    mask = tf.tile(mask, (1, 1, 4))
 
-    true_regr = tf.expand_dims(true_regr, axis=2)
-    true_regr = tf.tile(true_regr, (1, 1, num_classes, 1))
+    true_regr = tf.expand_dims(true_regr, axis=1)
+    true_regr = tf.tile(true_regr, (1, num_classes, 1))
 
     cls_loss = tf.losses.categorical_crossentropy(true_cls, pred_cls)
     cls_loss = tf.reduce_sum(cls_loss) / tf.reduce_sum(mask + eps)
