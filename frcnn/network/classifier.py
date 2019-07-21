@@ -14,6 +14,7 @@ class RoiClassifier(tf.keras.layers.Layer):
                                               name='out_regr')
 
     def call(self, x, **kwargs):
+        x.set_shape((None, 7, 7, 512))
         x = self.flatten(x)
         x = self.fc1(x)
         x = self.do1(x)
