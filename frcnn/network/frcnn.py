@@ -117,11 +117,13 @@ class FasterRCNNModel(tf.keras.models.Model):
                     grad = tape.gradient(loss, self.trainable_variables)
                     rpn_optimizer.apply_gradients(zip(grad, self.trainable_variables))
             rois, roi_y = self._roi_align(rpn_outs, gt_boxes)
-            for i in range(tf.shape(rois)[1]):
-                t_rois = rois[:, i, :, :, :]
-                t_roi_y = roi_y[:, i, :]
-                t_roi_outs = self.classifier(t_rois)
-                loss = roi_loss(t_roi_y, t_roi_outs, self.num_classes)
+            rois = tf.reshape(rois, (-1, 7, 7, 512))
+            roi_y = tf.reshape(roi_y, (-1, 106))
+            roi_dataset = tf.data.Dataset.from_tensor_slices((rois, roi_y))
+            roi_dataset = roi_dataset.batch(32)
+            for i, (rois, roi_y) in enumerate(roi_dataset):
+                roi_outs = self.classifier(rois)
+                loss = roi_loss(roi_y, roi_outs, self.num_classes)
                 tf.print(i, loss)
                 losses.write(idx, loss)
                 idx+=1
