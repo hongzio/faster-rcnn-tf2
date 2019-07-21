@@ -102,11 +102,15 @@ class FasterRCNNModel(tf.keras.models.Model):
         return tf.convert_to_tensor(rois), tf.convert_to_tensor(ys)
 
     def call(self, x, rpn_y, gt_boxes, rpn_optimizer, **kwargs):
+        losses = tf.TensorArray(tf.float32, size=10, dynamic_size=True)
+        idx = 0
         with tf.GradientTape(persistent=True) as tape:
             rpn_outs = self.rpn(x)
             for y, rpn_out in zip(rpn_y, rpn_outs):
                 loss = rpn_loss(y, rpn_out)
-                self.add_loss(loss)
+                losses.write(idx, loss)
+                idx+=1
+                tf.print(loss)
                 if tf.equal(loss, 0):
                     continue
                 with tape.stop_recording():
@@ -118,9 +122,11 @@ class FasterRCNNModel(tf.keras.models.Model):
                 t_roi_y = roi_y[:, i, :]
                 t_roi_outs = self.classifier(t_rois)
                 loss = roi_loss(t_roi_y, t_roi_outs, self.num_classes)
-                self.add_loss(loss)
+                tf.print(i, loss)
+                losses.write(idx, loss)
+                idx+=1
                 with tape.stop_recording():
                     grad = tape.gradient(loss, self.trainable_variables)
                     rpn_optimizer.apply_gradients(zip(grad, self.trainable_variables))
         del tape
-        return tf.reduce_sum(self.losses)
+        return losses

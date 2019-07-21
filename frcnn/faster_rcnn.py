@@ -39,7 +39,8 @@ class FasterRCNN:
 
     @tf.function
     def _train_step(self, x, rpn_y, gt_boxes):
-        return self.model(x, rpn_y, gt_boxes, self.rpn_optimizer)
+        self.model(x, rpn_y, gt_boxes, self.rpn_optimizer)
+        return tf.reduce_sum(self.model.losses)
         # with tf.GradientTape(persistent=True) as tape:
         #     losses = self.model.losses
         # gradient = tape.gradient(losses, self.model.trainable_variables)
