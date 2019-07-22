@@ -63,7 +63,7 @@ def roi_loss(y_true, y_pred, num_classes):
     true_regr = tf.tile(true_regr, (1, num_classes, 1))
 
     cls_loss = tf.losses.categorical_crossentropy(true_cls, pred_cls)
-    cls_loss = tf.reduce_sum(cls_loss) / tf.reduce_sum(mask + eps)
+    cls_loss = tf.reduce_sum(cls_loss)
 
     regr_loss = tf.reduce_sum(tf.math.square(true_regr - pred_regr) * mask) / tf.reduce_sum(mask + eps)
 
