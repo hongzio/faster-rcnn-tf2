@@ -8,7 +8,7 @@ from frcnn.network.rpn import RPN
 from frcnn.util.anchor import regress_to_coord, broadcast_iou
 
 
-class FasterRCNNModel(tf.keras.models.Model):
+class FasterRCNNTrainer(tf.keras.models.Model):
 
     def __init__(self, anchors, backbone, rpn_batch_size, roi_batch_size, num_classes, max_num_rois=300, roi_size=7,
                  roi_overlap_threshold=0.7, **kwargs):

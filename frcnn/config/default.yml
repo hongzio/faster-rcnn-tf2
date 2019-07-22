@@ -15,3 +15,6 @@ train:
   roi_batch_size: 1
   roi_size: 7
   roi_overlap_threshold: 0.4
+
+  checkpoint_dir: _ckpt
+  model_file: model.h5
