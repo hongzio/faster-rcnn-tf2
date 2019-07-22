@@ -22,7 +22,7 @@ class FasterRCNN:
                                      )
         self.dataset = None
         self.train_loss = tf.keras.metrics.Mean(name='train_loss')
-        self.optimizer = tf.keras.optimizers.Adam(1e-5)
+        self.optimizer = tf.keras.optimizers.Adam(self.config['train']['lr'])
 
 
     def init_train_context(self):

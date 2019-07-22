@@ -6,6 +6,7 @@ data:
 
 train:
   epoch: 80
+  lr: 1e-5
   max_iou: 0.7
   min_iou: 0.3
   max_num_gt_boxes: 100
