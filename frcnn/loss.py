@@ -1,4 +1,7 @@
 import tensorflow as tf
+from tensorflow.python.framework.errors_impl import InvalidArgumentError
+
+
 def _hard_negative_sampling(losses, valid_mask, overlap_mask):
     neg_mask = tf.math.logical_and(tf.equal(valid_mask, 1.0), tf.not_equal(overlap_mask, 1.0))
     pos_idx = tf.where(tf.math.logical_not(neg_mask))
@@ -12,7 +15,10 @@ def _hard_negative_sampling(losses, valid_mask, overlap_mask):
     neg_sample_idx = tf.where(neg_samples)
     neg_sample_idx = tf.random.shuffle(neg_sample_idx)
     ret = tf.zeros(tf.shape(valid_mask))
-    ret = tf.tensor_scatter_nd_update(ret, neg_sample_idx[:neg_cnt], tf.ones((neg_cnt, )))
+    try:
+        ret = tf.tensor_scatter_nd_update(ret, neg_sample_idx[:neg_cnt], tf.ones((neg_cnt, )))
+    except InvalidArgumentError as e:
+        print(e)
     return ret
 
 eps = 1e-6

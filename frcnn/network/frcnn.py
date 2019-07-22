@@ -10,12 +10,13 @@ from frcnn.util.anchor import regress_to_coord, broadcast_iou
 
 class FasterRCNNModel(tf.keras.models.Model):
 
-    def __init__(self, anchors, backbone, batch_size, num_classes, max_num_rois=300, roi_size=7,
+    def __init__(self, anchors, backbone, rpn_batch_size, roi_batch_size, num_classes, max_num_rois=300, roi_size=7,
                  roi_overlap_threshold=0.7, **kwargs):
         super().__init__(**kwargs)
         self.anchors = anchors
         self.max_num_rois = tf.constant(max_num_rois)
-        self.batch_size = batch_size
+        self.rpn_batch_size = rpn_batch_size
+        self.roi_batch_size = roi_batch_size
         self.roi_size = roi_size
         self.roi_overlap_threshold = roi_overlap_threshold
         self.num_classes = num_classes
@@ -69,20 +70,13 @@ class FasterRCNNModel(tf.keras.models.Model):
             rpn_regress = rpn_out[1]
             rpn_feature_map = rpn_out[2]
             boxes = regress_to_coord(rpn_regress, self.anchors)
-            for n in range(self.batch_size):
+            for n in range(self.rpn_batch_size):
                 nth_boxes = tf.reshape(boxes[n], (-1, 4))
                 nth_scores = tf.reshape(rpn_score[n], (-1,))
                 selected_nth_indices = tf.image.non_max_suppression(nth_boxes, nth_scores, self.max_num_rois)
                 selected_nth_boxes = tf.gather(nth_boxes, selected_nth_indices)
                 is_valid = tf.ones((tf.shape(selected_nth_boxes)[0],))
                 num_boxes = tf.shape(selected_nth_boxes)[0]
-                # paddings = tf.zeros((2, 2), dtype=tf.int32)
-                # paddings = tf.tensor_scatter_nd_update(paddings,
-                #                                        tf.constant([[0, 1]]),
-                #                                        tf.expand_dims(self.max_num_rois - num_boxes, axis=0))
-                # selected_nth_boxes = tf.pad(selected_nth_boxes,
-                #                             paddings)
-                # is_valid = tf.pad(is_valid, paddings[0:1, :])
                 box_indices = tf.constant(n, shape=(1, ))
                 box_indices = tf.tile(box_indices, tf.expand_dims(num_boxes, axis=0))
                 roi = tf.image.crop_and_resize(rpn_feature_map,
@@ -133,10 +127,9 @@ class FasterRCNNModel(tf.keras.models.Model):
         roi_xs = tf.reshape(roi_xs, (-1, 7, 7, 512))
         roi_ys = tf.reshape(roi_ys, (-1, 106))
         roi_xs, roi_ys = self.sample_rois(roi_xs, roi_ys)
-        batch_size = 8
-        for i in range(0, tf.shape(roi_xs)[0], batch_size):
-            roi_x = roi_xs[i:i+batch_size]
-            roi_y = roi_ys[i:i+batch_size]
+        for i in range(0, tf.shape(roi_xs)[0], self.roi_batch_size):
+            roi_x = roi_xs[i:i+self.roi_batch_size]
+            roi_y = roi_ys[i:i+self.roi_batch_size]
             roi_pred = self.classifier(roi_x)
             loss = roi_loss(roi_y, roi_pred, self.num_classes)
             losses += loss

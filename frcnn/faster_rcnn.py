@@ -13,7 +13,8 @@ class FasterRCNN:
         self.config = config
         self.anchors = make_anchors(config)
         self.model = FasterRCNNModel(self.anchors, VGG,
-                                     self.config['train']['batch_size'],
+                                     self.config['train']['rpn_batch_size'],
+                                     self.config['train']['roi_batch_size'],
                                      self.config['data']['num_classes'],
                                      self.config['train']['max_num_rois'],
                                      self.config['train']['roi_size'],
@@ -21,7 +22,8 @@ class FasterRCNN:
                                      )
         self.dataset = None
         self.train_loss = tf.keras.metrics.Mean(name='train_loss')
-        self.optimizer = tf.keras.optimizers.Adam(1e-4)
+        self.optimizer = tf.keras.optimizers.Adam(1e-6)
+
 
     def init_train_context(self):
         dataset = fake_dataset()
@@ -33,9 +35,9 @@ class FasterRCNN:
                                                                         self.config['train']['min_iou'],
                                                                         self.config['train']['max_iou'],
                                                                         self.config['train']['max_num_gt_boxes'])))
-        self.dataset = dataset.batch(self.config['train']['batch_size'])
+        self.dataset = dataset.batch(self.config['train']['rpn_batch_size'])
 
-    @tf.function
+    # @tf.function
     def _train_step(self, x, rpn_y, gt_boxes):
         with tf.GradientTape() as tape:
             loss = self.model(x, rpn_y, gt_boxes)
@@ -45,7 +47,7 @@ class FasterRCNN:
 
     def train(self):
         self.init_train_context()
-        for epoch in range(10):
+        for epoch in range(self.config['train']['epoch']):
             for step, (x, (rpn_y, gt_boxes)) in enumerate(self.dataset):
                 loss = self._train_step(x, rpn_y, gt_boxes)
                 self.train_loss(loss)
