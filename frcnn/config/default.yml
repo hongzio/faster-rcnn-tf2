@@ -17,4 +17,6 @@ train:
   roi_overlap_threshold: 0.4
 
   checkpoint_dir: _ckpt
+  restore_ckpt: True
   model_file: model.h5
+  load_saved_model: True

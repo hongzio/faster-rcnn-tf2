@@ -56,10 +56,13 @@ class FasterRCNN:
         self.ckpt_manager = tf.train.CheckpointManager(self.ckpt,
                                                        self.config['train']['checkpoint_dir'],
                                                        max_to_keep=3)
-        # self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
-        # self.rpn.build(input_shape=(None, 416, 416, 3))
-        # self.classifier.build(input_shape=(None, self._roi_size, self._roi_size, 512))
-        # self.saver.load_weights(self.config['train']['model_file'])
+
+        if self.config['train']['restore_ckpt']:
+            self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
+        if self.config['train']['load_saved_model']:
+            self.rpn.build(input_shape=(None, 416, 416, 3))
+            self.classifier.build(input_shape=(None, self._roi_size, self._roi_size, 512))
+            self.saver.load_weights(self.config['train']['model_file'])
 
     def _calc_roi_target(self, pred_boxes, gt_boxes):
         tiled_pred_boxes = tf.expand_dims(pred_boxes, axis=1)
@@ -185,7 +188,7 @@ class FasterRCNN:
                 rois.append(roi)
         return rois
 
-    def _nms(self, rpn_boxes_layers, rpn_objs_layers, iou_threshold=0.5):
+    def _nms(self, rpn_boxes_layers, rpn_objs_layers, iou_threshold=0.5, score_threshold=float('-inf')):
         ret = []
         for rpn_boxes, rpn_objs in zip(rpn_boxes_layers, rpn_objs_layers):
             boxes_per_batch = []
@@ -194,7 +197,8 @@ class FasterRCNN:
                 nth_objs = rpn_objs[n]
                 nth_boxes = tf.reshape(nth_boxes, (-1, 4))
                 nth_objs = tf.reshape(nth_objs, (-1, ))
-                selected_indices = tf.image.non_max_suppression(nth_boxes, nth_objs, self.config['train']['max_num_rois'], iou_threshold=iou_threshold)
+                selected_indices = tf.image.non_max_suppression(nth_boxes, nth_objs, self.config['train']['max_num_rois'],
+                                                                iou_threshold=iou_threshold, score_threshold=score_threshold)
                 selected_boxes = tf.gather(nth_boxes, selected_indices)
                 boxes_per_batch.append(selected_boxes)
             ret.append(boxes_per_batch)
@@ -291,7 +295,7 @@ class FasterRCNN:
         rpn_objs, rpn_regrs, rpn_features = self.rpn(img)
         anchor_boxes = self._anchor_boxes_like(rpn_regrs)
         rpn_boxes = self._apply_regr(anchor_boxes, rpn_regrs)
-        suppressed_boxes = self._nms(rpn_boxes, rpn_objs, iou_threshold=0.7)
+        suppressed_boxes = self._nms(rpn_boxes, rpn_objs, iou_threshold=0.7, score_threshold=0.8)
         roi_xs = self._roi_align(rpn_features, suppressed_boxes)
         roi_clses, roi_regrs = self._classify(roi_xs)
         obj_boxes, obj_regrs, obj_clses = self._select_objs(list(itertools.chain.from_iterable(suppressed_boxes)), roi_regrs, roi_clses)
