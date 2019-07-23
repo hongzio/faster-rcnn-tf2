@@ -5,14 +5,14 @@ data:
   num_classes: 100
 
 train:
-  epoch: 80
+  epoch: 160
   lr: 1e-5
   max_iou: 0.7
   min_iou: 0.3
   max_num_gt_boxes: 100
   max_num_rois: 300
   rpn_batch_size: 1
-  roi_batch_size: 1
+  roi_batch_size: 4
   roi_size: 7
   roi_overlap_threshold: 0.4
 

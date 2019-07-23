@@ -1,5 +1,5 @@
 import tensorflow as tf
-class RoiClassifier(tf.keras.layers.Layer):
+class RoiClassifier(tf.keras.models.Model):
     def __init__(self, num_classes, **kwargs):
         super().__init__(**kwargs)
         self.flatten = tf.keras.layers.Flatten(name='flatten')
@@ -14,7 +14,7 @@ class RoiClassifier(tf.keras.layers.Layer):
                                               name='out_regr')
 
     def call(self, x, **kwargs):
-        x.set_shape((None, 7, 7, 512))
+        # x.set_shape((None, 7, 7, 512))
         x = self.flatten(x)
         x = self.fc1(x)
         x = self.do1(x)

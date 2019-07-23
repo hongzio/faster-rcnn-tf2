@@ -22,14 +22,13 @@ def _hard_negative_sampling(losses, valid_mask, overlap_mask):
     return ret
 
 eps = 1e-6
-def rpn_loss(y_true, rpn_out):
-    valid_mask = y_true[..., 0]
-    overlap_mask = y_true[..., 1]
+def rpn_loss(rpn_y, rpn_pred_obj, rpn_pred_regr):
+    valid_mask = rpn_y[..., 0]
+    overlap_mask = rpn_y[..., 1]
 
-    rpn_obj_pred = rpn_out[0]
-    rpn_obj_pred = tf.expand_dims(rpn_obj_pred, axis=-1)
-    overlap_mask_reshaped = tf.reshape(overlap_mask, tf.shape(rpn_obj_pred))
-    rpn_obj_loss = valid_mask * tf.keras.losses.binary_crossentropy(overlap_mask_reshaped, rpn_obj_pred)
+    rpn_pred_obj = tf.expand_dims(rpn_pred_obj, axis=-1)
+    overlap_mask_reshaped = tf.reshape(overlap_mask, tf.shape(rpn_pred_obj))
+    rpn_obj_loss = valid_mask * tf.keras.losses.binary_crossentropy(overlap_mask_reshaped, rpn_pred_obj)
 
     negative_mask = _hard_negative_sampling(rpn_obj_loss, valid_mask, overlap_mask)
     train_mask = tf.cast(tf.logical_or(tf.cast(overlap_mask, tf.bool), tf.cast(negative_mask, tf.bool)), tf.float32)
@@ -38,21 +37,18 @@ def rpn_loss(y_true, rpn_out):
     rpn_obj_loss = tf.math.reduce_sum(rpn_obj_loss) / (tf.math.reduce_sum(train_mask)+eps)
 
 
-    rpn_regress_pred = tf.reshape(rpn_out[1], y_true[..., 2:].shape)
-    rpn_regress_loss = tf.math.square(y_true[..., 2:] - rpn_regress_pred)
+    rpn_regress_pred = tf.reshape(rpn_pred_regr, rpn_y[..., 2:].shape)
+    rpn_regress_loss = tf.math.square(rpn_y[..., 2:] - rpn_regress_pred)
 
     tiled_train_mask = tf.tile(tf.expand_dims(train_mask, axis=-1), (1, 1, 1, 1, 4))
-    rpn_regress_loss = tf.math.reduce_sum(tiled_train_mask * rpn_regress_loss) / tf.math.reduce_sum(tiled_train_mask + eps)
+    rpn_regress_loss = tf.math.reduce_sum(tiled_train_mask * rpn_regress_loss) / (tf.math.reduce_sum(tiled_train_mask) + eps)
     return rpn_obj_loss + rpn_regress_loss
 
 
-def roi_loss(y_true, y_pred, num_classes):
-    is_valid = y_true[..., 0]
-    true_regr = y_true[..., 1:5]
-    true_cls = y_true[..., 5:]
+def roi_loss(y_true, pred_cls, pred_regr, num_classes):
+    true_regr = y_true[..., :4]
+    true_cls = y_true[..., 4:]
 
-    pred_cls = y_pred[0] # (None, num_classes+1)
-    pred_regr = y_pred[1] # (None, num_classes)
     pred_regr = tf.reshape(pred_regr, (tf.shape(pred_regr)[0], num_classes, 4))
 
     mask = true_cls[..., :-1]
@@ -65,6 +61,6 @@ def roi_loss(y_true, y_pred, num_classes):
     cls_loss = tf.losses.categorical_crossentropy(true_cls, pred_cls)
     cls_loss = tf.reduce_sum(cls_loss)
 
-    regr_loss = tf.reduce_sum(tf.math.square(true_regr - pred_regr) * mask) / tf.reduce_sum(mask + eps)
+    regr_loss = tf.reduce_sum(tf.math.square(true_regr - pred_regr) * mask) / (tf.reduce_sum(mask) + eps)
 
-    return tf.reduce_sum(cls_loss) + tf.reduce_sum(regr_loss)
+    return cls_loss + regr_loss

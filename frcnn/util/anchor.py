@@ -48,31 +48,6 @@ def broadcast_iou(ref_box, anchor_box):
 
 
 
-def regress_to_coord(regress, anchors):
-    regress_shape = tf.cast(tf.shape(regress), tf.float32)
-    N = regress_shape[0]
-    H = regress_shape[1]
-    W = regress_shape[2]
-    anchors_coord = make_anchor_coords(H, W, anchors)
-    anchors_coord = tf.expand_dims(anchors_coord, axis=0)
-    anchors_coord = tf.tile(anchors_coord, (N, 1, 1, 1, 1))
-    anchor_center_y = (anchors_coord[..., 0] + anchors_coord[..., 2]) / 2
-    anchor_center_x = (anchors_coord[..., 1] + anchors_coord[..., 3]) / 2
-    anchor_h = anchors_coord[..., 2] - anchors_coord[..., 0]
-    anchor_w = anchors_coord[..., 3] - anchors_coord[..., 1]
-
-    regress = tf.reshape(regress, tf.shape(anchors_coord))
-
-    anchor_new_y = regress[..., 0] * anchor_h + anchor_center_y
-    anchor_new_x = regress[..., 1] * anchor_w + anchor_center_x
-    anchor_new_h = tf.math.exp(regress[..., 2]) * anchor_h
-    anchor_new_w = tf.math.exp(regress[..., 3]) * anchor_w
-    coords = tf.stack([anchor_new_y - anchor_new_h / 2,
-                       anchor_new_x - anchor_new_w / 2,
-                       anchor_new_y + anchor_new_h / 2,
-                       anchor_new_x + anchor_new_w / 2], axis=-1)
-    return coords
-
 def transform(bboxes, anchors, output_sizes, min_iou, max_iou, max_num_boxes=100):
     # Padding bboxes
     paddings = [[0, max_num_boxes - tf.shape(bboxes)[0]],
