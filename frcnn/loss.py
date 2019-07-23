@@ -10,8 +10,8 @@ def _hard_negative_sampling(losses, valid_mask, overlap_mask):
     sorted_losses = tf.sort(flat_neg_losses, direction='DESCENDING')
     pos_cnt = tf.math.count_nonzero(overlap_mask)
     # TODO In the case of fake dataset, empty positive sample induces meaningless result.
-    # neg_cnt = pos_cnt
-    neg_cnt = tf.math.maximum(pos_cnt, 8)
+    # neg_cnt = pos_cnt*3
+    neg_cnt = tf.math.maximum(pos_cnt*3, 30)
     threshold = sorted_losses[neg_cnt]
     neg_samples = tf.math.greater_equal(losses, threshold)
     neg_sample_idx = tf.where(neg_samples)

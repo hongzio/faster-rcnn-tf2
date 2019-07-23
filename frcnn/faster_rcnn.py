@@ -123,8 +123,8 @@ class FasterRCNN:
             # random_idx = random_idx[:pos_cnt]
             # neg_xs = tf.gather_nd(neg_xs, random_idx)
             # neg_ys = tf.gather_nd(neg_ys, random_idx)
-            neg_xs = neg_xs[:pos_cnt]
-            neg_ys = neg_ys[:pos_cnt]
+            neg_xs = neg_xs[:pos_cnt*3]
+            neg_ys = neg_ys[:pos_cnt*3]
             ret_roi_xs = tf.concat([pos_xs, neg_xs], axis=0)
             ret_roi_ys = tf.concat([pos_ys, neg_ys], axis=0)
             ret_xs.append(ret_roi_xs)
