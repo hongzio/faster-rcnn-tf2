@@ -45,6 +45,7 @@ class FasterRCNN:
                                                                         self.config['train']['min_iou'],
                                                                         self.config['train']['max_iou'],
                                                                         self.config['train']['max_num_gt_boxes'])))
+        dataset = dataset.prefetch(self.config['train']['rpn_batch_size'])
         self.dataset = dataset.batch(self.config['train']['rpn_batch_size'])
 
         self.train_loss = tf.keras.metrics.Mean(name='train_loss')
