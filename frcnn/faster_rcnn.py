@@ -57,9 +57,9 @@ class FasterRCNN:
                                                        self.config['train']['checkpoint_dir'],
                                                        max_to_keep=3)
         # self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
-        self.rpn.build(input_shape=(None, 416, 416, 3))
-        self.classifier.build(input_shape=(None, self._roi_size, self._roi_size, 512))
-        self.saver.load_weights(self.config['train']['model_file'])
+        # self.rpn.build(input_shape=(None, 416, 416, 3))
+        # self.classifier.build(input_shape=(None, self._roi_size, self._roi_size, 512))
+        # self.saver.load_weights(self.config['train']['model_file'])
 
     def _calc_roi_target(self, pred_boxes, gt_boxes):
         tiled_pred_boxes = tf.expand_dims(pred_boxes, axis=1)
@@ -225,7 +225,7 @@ class FasterRCNN:
             losses += loss
         return losses
 
-    # @tf.function
+    @tf.function
     def _train_step(self, x, rpn_ys, gt_boxes):
         with tf.GradientTape() as tape:
             rpn_objs, rpn_regrs, rpn_features = self.rpn(x)
