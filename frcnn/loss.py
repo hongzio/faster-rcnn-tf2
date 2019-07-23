@@ -9,7 +9,7 @@ def _hard_negative_sampling(losses, valid_mask, overlap_mask):
     flat_neg_losses = tf.reshape(neg_losses, (-1, ))
     sorted_losses = tf.sort(flat_neg_losses, direction='DESCENDING')
     pos_cnt = tf.math.count_nonzero(overlap_mask)
-    neg_cnt = pos_cnt
+    neg_cnt = tf.math.maximum(pos_cnt, 8)
     threshold = sorted_losses[neg_cnt]
     neg_samples = tf.math.greater_equal(losses, threshold)
     neg_sample_idx = tf.where(neg_samples)
