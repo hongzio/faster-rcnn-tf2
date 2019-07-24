@@ -4,6 +4,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - "ROOT_PW=${ROOT_PW}"
     volumes:
       - .:/opt/project
       - "${VOC_TRAIN_PATH}:/dataset/voc_train"

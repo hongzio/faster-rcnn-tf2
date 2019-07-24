@@ -13,6 +13,7 @@ ENV NOTVISIBLE "in users profile"
 RUN echo "export VISIBLE=now" >> /etc/profile
 RUN pip install PyYAML
 
+ARG ROOT_PW
 RUN echo 'root:$ROOT_PW' | chpasswd
 
 RUN rm /etc/bash.bashrc
