@@ -22,3 +22,7 @@ def fake_dataset():
 
     dataset = tf.data.Dataset.from_generator(_data_generator, (tf.int32, tf.float32), ((None, None, 3), (None, 5)))
     return dataset
+
+
+def voc_dataset():
+    pass

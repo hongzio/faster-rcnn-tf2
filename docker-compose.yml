@@ -1,10 +1,12 @@
 version: '3'
 services:
-  train:
+  remote:
     build:
       context: .
       dockerfile: Dockerfile
     volumes:
       - .:/opt/project
+      - "${VOC_TRAIN_PATH}:/dataset/voc_train"
+      - "${VOC_TEST_PATH}:/dataset/voc_test"
     working_dir: /opt/project
     tty: true
