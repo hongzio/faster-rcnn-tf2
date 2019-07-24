@@ -23,6 +23,23 @@ def fake_dataset():
     dataset = tf.data.Dataset.from_generator(_data_generator, (tf.int32, tf.float32), ((None, None, 3), (None, 5)))
     return dataset
 
+def _load_id_list(path):
+    with open(path, 'r') as f:
+        ret = [line.rstrip('\n') for line in f]
+    return ret
 
-def voc_dataset():
-    pass
+def voc_dataset(data_path, file_name):
+    dirs = os.listdir(data_path)
+    years = list(filter(lambda dir: dir in ['VOC2007', 'VOC2012'], dirs))
+    year_id_list = []
+    for year in years:
+        id_list_file = os.path.join(data_path, year, 'ImageSets', 'Main', file_name)
+        id_list = _load_id_list(id_list_file)
+        year_id_list += [(year, id) for id in id_list]
+    def _data_generator():
+        for year, id in year_id_list:
+            img_path = os.path.join(data_path, year, 'JPEGImages', id, '.jpg')
+            anno_path = os.path.join(data_path, year, 'Annotations', id, '.xml')
+            img = tf.image.decode_png(open(img_path, 'rb').read(), channels=3)
+            yield img
+

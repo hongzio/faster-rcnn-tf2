@@ -1,8 +1,17 @@
 anchor:
   sizes: [3, 6, 9]
   ratios: [[1.0, 1.0], [1.0, 1.5], [1.5, 1.0]]
+
 data:
+  loader: 'voc'
+  train_path: /dataset/voc_train
+  test_path: /dataset/voc_test
   num_classes: 100
+
+roi_size: 7
+roi_overlap_threshold: 0.4
+max_num_rois: 300
+
 
 train:
   epoch: 200
@@ -10,10 +19,7 @@ train:
   max_iou: 0.7
   min_iou: 0.3
   max_num_gt_boxes: 100
-  max_num_rois: 300
-  rpn_batch_size: 2
-  roi_size: 7
-  roi_overlap_threshold: 0.4
+  batch_size: 2
 
   checkpoint_dir: _ckpt
   restore_ckpt: True

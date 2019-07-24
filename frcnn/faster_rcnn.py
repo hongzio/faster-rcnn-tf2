@@ -1,7 +1,7 @@
 import itertools
 
 from frcnn.backbone.vgg import VGG
-from frcnn.dataset.dataset import fake_dataset
+from frcnn.dataset.dataset import fake_dataset, voc_train_dataset, voc_dataset
 from frcnn.loss import rpn_loss, roi_loss
 from frcnn.network.classifier import RoiClassifier
 from frcnn.network.rpn import RPN
@@ -33,11 +33,12 @@ class FasterRCNN:
         self.ckpt = None
         self.ckpt_manager = None
 
-        self._roi_size = self.config['train']['roi_size']
+        self._roi_size = self.config['roi_size']
 
 
     def _init_train_context(self):
-        dataset = fake_dataset()
+        dataset = voc_dataset(self.config['data']['train_path'], 'train.txt')
+        # dataset = fake_dataset()
         dataset = dataset.map(lambda image, gt_boxes: (tf.image.resize(image, (416, 416)), gt_boxes))
         dataset = dataset.map(lambda image, gt_boxes: (image, transform(gt_boxes,
                                                                         self.anchors,
@@ -45,7 +46,7 @@ class FasterRCNN:
                                                                         self.config['train']['min_iou'],
                                                                         self.config['train']['max_iou'],
                                                                         self.config['train']['max_num_gt_boxes'])))
-        self.dataset = dataset.batch(self.config['train']['rpn_batch_size'])
+        self.dataset = dataset.batch(self.config['train']['batch_size'])
 
         self.train_loss = tf.keras.metrics.Mean(name='train_loss')
         self.optimizer = tf.keras.optimizers.Adam(float(self.config['train']['lr']))
@@ -70,7 +71,7 @@ class FasterRCNN:
         ious = broadcast_iou(gt_boxes[..., :4], tiled_pred_boxes)
         best_bbox_idx = tf.argmax(ious, axis=-1)
         best_gt_boxes = tf.gather(gt_boxes, best_bbox_idx)
-        is_overlap = tf.reduce_max(ious, axis=-1) > self.config['train']['roi_overlap_threshold']
+        is_overlap = tf.reduce_max(ious, axis=-1) > self.config['roi_overlap_threshold']
 
         gt_boxes_y = (best_gt_boxes[..., 0] + best_gt_boxes[..., 2]) / 2
         gt_boxes_x = (best_gt_boxes[..., 1] + best_gt_boxes[..., 3]) / 2
@@ -176,7 +177,7 @@ class FasterRCNN:
     def _roi_align(self, rpn_features_layers, rpn_boxes_layers):
         rois = []
         for rpn_features, rpn_boxes in zip(rpn_features_layers, rpn_boxes_layers):
-            for n in range(self.config['train']['rpn_batch_size']):
+            for n in range(self.config['train']['batch_size']):
                 nth_boxes = rpn_boxes[n]
                 num_boxes = tf.shape(nth_boxes)[0]
                 box_indices = tf.constant(n, shape=(1,))
@@ -192,12 +193,12 @@ class FasterRCNN:
         ret = []
         for rpn_boxes, rpn_objs in zip(rpn_boxes_layers, rpn_objs_layers):
             boxes_per_batch = []
-            for n in range(self.config['train']['rpn_batch_size']):
+            for n in range(self.config['train']['batch_size']):
                 nth_boxes = rpn_boxes[n]
                 nth_objs = rpn_objs[n]
                 nth_boxes = tf.reshape(nth_boxes, (-1, 4))
                 nth_objs = tf.reshape(nth_objs, (-1, ))
-                selected_indices = tf.image.non_max_suppression(nth_boxes, nth_objs, self.config['train']['max_num_rois'],
+                selected_indices = tf.image.non_max_suppression(nth_boxes, nth_objs, self.config['max_num_rois'],
                                                                 iou_threshold=iou_threshold, score_threshold=score_threshold)
                 selected_boxes = tf.gather(nth_boxes, selected_indices)
                 boxes_per_batch.append(selected_boxes)
@@ -207,7 +208,7 @@ class FasterRCNN:
     def _roi_target(self, rpn_boxes_layers, gt_boxes):
         ret = []
         for rpn_boxes in rpn_boxes_layers:
-            for n in range(self.config['train']['rpn_batch_size']):
+            for n in range(self.config['train']['batch_size']):
                 roi_regr = self._calc_roi_target(rpn_boxes[n], gt_boxes[n])
                 ret.append(roi_regr)
         return ret
