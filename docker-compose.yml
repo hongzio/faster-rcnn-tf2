@@ -10,3 +10,5 @@ services:
       - "${VOC_TEST_PATH}:/dataset/voc_test"
     working_dir: /opt/project
     tty: true
+    ports:
+      - "8888:22"
