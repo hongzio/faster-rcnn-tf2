@@ -5,7 +5,7 @@ data:
   num_classes: 100
 
 train:
-  epoch: 160
+  epoch: 200
   lr: 1e-5
   max_iou: 0.7
   min_iou: 0.3

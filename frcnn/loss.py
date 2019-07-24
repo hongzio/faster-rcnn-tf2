@@ -39,12 +39,15 @@ def rpn_loss(rpn_y, rpn_pred_obj, rpn_pred_regr):
     rpn_obj_loss = tf.math.reduce_sum(rpn_obj_loss) / (tf.math.reduce_sum(train_mask)+eps)
 
 
-    rpn_regress_pred = tf.reshape(rpn_pred_regr, rpn_y[..., 2:].shape)
-    rpn_regress_loss = tf.math.square(rpn_y[..., 2:] - rpn_regress_pred)
+    regr_pred = tf.reshape(rpn_pred_regr, rpn_y[..., 2:].shape)
+    regr_diff = rpn_y[..., 2:] - regr_pred
+    abs_regr_diff = tf.math.abs(regr_diff)
+    smooth_l1_sign = tf.cast(tf.less(abs_regr_diff, 1.), tf.float32)
+    rpn_regress_loss = tf.math.pow(regr_diff, 2) * 0.5 * smooth_l1_sign + ((abs_regr_diff - 0.5) * (1. - smooth_l1_sign))
 
     tiled_train_mask = tf.tile(tf.expand_dims(train_mask, axis=-1), (1, 1, 1, 1, 4))
     rpn_regress_loss = tf.math.reduce_sum(tiled_train_mask * rpn_regress_loss) / (tf.math.reduce_sum(tiled_train_mask) + eps)
-    return rpn_obj_loss + rpn_regress_loss
+    return rpn_obj_loss + 10. * rpn_regress_loss
 
 
 def roi_loss(y_true, pred_cls, pred_regr, num_classes):
@@ -63,6 +66,10 @@ def roi_loss(y_true, pred_cls, pred_regr, num_classes):
     cls_loss = tf.losses.categorical_crossentropy(true_cls, pred_cls)
     cls_loss = tf.reduce_sum(cls_loss)
 
-    regr_loss = tf.reduce_sum(tf.math.square(true_regr - pred_regr) * mask) / (tf.reduce_sum(mask) + eps)
+    regr_diff = true_regr - pred_regr
+    abs_regr_diff = tf.math.abs(regr_diff)
+    smooth_l1_sign = tf.cast(tf.less(abs_regr_diff, 1.), tf.float32)
+    regr_loss = tf.math.pow(regr_diff, 2) * 0.5 * smooth_l1_sign + ((abs_regr_diff - 0.5) * (1. - smooth_l1_sign))
+    regr_loss = tf.reduce_sum(regr_loss * mask) / (tf.reduce_sum(mask) + eps)
 
-    return cls_loss + regr_loss
+    return cls_loss + 10. * regr_loss
