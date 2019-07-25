@@ -11,11 +11,14 @@ RUN echo "export PATH=$PATH" >> /etc/profile && echo "ldconfig" >> /etc/profile
 
 ENV NOTVISIBLE "in users profile"
 RUN echo "export VISIBLE=now" >> /etc/profile
-RUN pip install PyYAML
-
-ARG ROOT_PW
-RUN echo 'root:$ROOT_PW' | chpasswd
+RUN pip install PyYAML tqdm
 
 RUN rm /etc/bash.bashrc
 EXPOSE 22
-CMD ["/usr/sbin/sshd", "-D"]
+EXPOSE 6006
+
+ARG ROOT_PW
+RUN echo "root:$ROOT_PW" | chpasswd
+
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT /entrypoint.sh

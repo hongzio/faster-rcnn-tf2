@@ -1,7 +1,7 @@
 import itertools
 
 from frcnn.backbone.vgg import VGG
-from frcnn.dataset.dataset import fake_dataset, voc_train_dataset, voc_dataset
+from frcnn.dataset.dataset import fake_dataset, voc_dataset
 from frcnn.loss import rpn_loss, roi_loss
 from frcnn.network.classifier import RoiClassifier
 from frcnn.network.rpn import RPN
@@ -10,6 +10,8 @@ from frcnn.util.anchor import make_anchors, transform, broadcast_iou, make_ancho
 import tensorflow as tf
 import os
 import numpy as np
+from tqdm import tqdm
+
 
 class Saver(tf.keras.models.Model):
     def __init__(self, rpn, classifier, **kwargs):
@@ -37,16 +39,16 @@ class FasterRCNN:
 
 
     def _init_train_context(self):
-        dataset = voc_dataset(self.config['data']['train_path'], 'train.txt')
-        # dataset = fake_dataset()
-        dataset = dataset.map(lambda image, gt_boxes: (tf.image.resize(image, (416, 416)), gt_boxes))
-        dataset = dataset.map(lambda image, gt_boxes: (image, transform(gt_boxes,
+        # train_dataset = voc_dataset(self.config['data']['train_path'], 'train.txt')
+        train_dataset = fake_dataset()
+        train_dataset = train_dataset.map(lambda image, gt_boxes: (tf.image.resize(image, (416, 416)), gt_boxes), num_parallel_calls=6)
+        train_dataset = train_dataset.map(lambda image, gt_boxes: (image, transform(gt_boxes,
                                                                         self.anchors,
                                                                         self.rpn.backbone.calc_output_size(tf.shape(image)),
                                                                         self.config['train']['min_iou'],
                                                                         self.config['train']['max_iou'],
-                                                                        self.config['train']['max_num_gt_boxes'])))
-        self.dataset = dataset.batch(self.config['train']['batch_size'])
+                                                                        self.config['train']['max_num_gt_boxes'])), num_parallel_calls=6)
+        self.train_dataset = train_dataset.batch(self.config['train']['batch_size'])
 
         self.train_loss = tf.keras.metrics.Mean(name='train_loss')
         self.optimizer = tf.keras.optimizers.Adam(float(self.config['train']['lr']))
@@ -57,12 +59,15 @@ class FasterRCNN:
         self.ckpt_manager = tf.train.CheckpointManager(self.ckpt,
                                                        self.config['train']['checkpoint_dir'],
                                                        max_to_keep=3)
+        self.logdir = '/tmp/summaries/fake'
+        self.train_summary_writer = tf.summary.create_file_writer(self.logdir)
+
+        self.rpn.build(input_shape=(None, 416, 416, 3))
+        self.classifier.build(input_shape=(None, self._roi_size, self._roi_size, 512))
 
         if self.config['train']['restore_ckpt']:
             self.ckpt.restore(self.ckpt_manager.latest_checkpoint)
         if self.config['train']['load_saved_model']:
-            self.rpn.build(input_shape=(None, 416, 416, 3))
-            self.classifier.build(input_shape=(None, self._roi_size, self._roi_size, 512))
             self.saver.load_weights(self.config['train']['model_file'])
 
     def _calc_roi_target(self, pred_boxes, gt_boxes):
@@ -121,7 +126,7 @@ class FasterRCNN:
             neg_cnt = tf.shape(neg_xs)[0]
             # https://github.com/tensorflow/tensorflow/issues/26608
             # random_idx = tf.random.shuffle(tf.expand_dims(tf.range(neg_cnt), axis=-1))
-            # random_idx = random_idx[:pos_cnt]
+            # random_idx = random_idx[:pos_cnt*3]
             # neg_xs = tf.gather_nd(neg_xs, random_idx)
             # neg_ys = tf.gather_nd(neg_ys, random_idx)
             neg_xs = neg_xs[:pos_cnt*3]
@@ -233,7 +238,9 @@ class FasterRCNN:
     @tf.function
     def _train_step(self, x, rpn_ys, gt_boxes):
         with tf.GradientTape() as tape:
+            # tf.summary.trace_on(graph=True, profiler=True)
             rpn_objs, rpn_regrs, rpn_features = self.rpn(x)
+            # tf.summary.trace_export(name="rpn", step=self.optimizer.iterations, profiler_outdir=self.logdir)
             rpn_loss = self._rpn_loss(rpn_ys, rpn_objs, rpn_regrs)
             anchor_boxes = self._anchor_boxes_like(rpn_regrs)
             rpn_boxes = self._apply_regr(anchor_boxes, rpn_regrs)
@@ -250,19 +257,25 @@ class FasterRCNN:
 
     def train(self):
         self._init_train_context()
-        best_loss = np.inf
-        for epoch in range(self.config['train']['epoch']):
-            for step, (x, (rpn_y, gt_boxes)) in enumerate(self.dataset):
-                loss = self._train_step(x, rpn_y, gt_boxes)
-                self.train_loss(loss)
-            print('Epoch {}: Loss: {}'.format(epoch, self.train_loss.result()))
+        with self.train_summary_writer.as_default():
+            best_loss = -1
+            for epoch in range(self.config['train']['epoch']):
+                for step, (x, (rpn_y, gt_boxes)) in enumerate(self.train_dataset):
+                    # print('>', step, end='')
+                    loss = self._train_step(x, rpn_y, gt_boxes)
+                    tf.summary.scalar('train_loss', loss, step=self.optimizer.iterations)
+                    self.train_loss(loss)
+                print('Epoch {}: Loss: {}'.format(epoch, self.train_loss.result()))
 
-            self.ckpt_manager.save()
-            if best_loss > self.train_loss.result().numpy():
-                print('Saved model')
-                self.saver.save_weights(self.config['train']['model_file'])
-                best_loss = self.train_loss.result().numpy()
-            self.train_loss.reset_states()
+                self.ckpt_manager.save()
+                if best_loss == -1:
+                    best_loss = self.train_loss.result().numpy()
+
+                if best_loss > self.train_loss.result().numpy():
+                    best_loss = self.train_loss.result().numpy()
+                    print('Saved model')
+                    self.saver.save_weights(self.config['train']['model_file'])
+                self.train_loss.reset_states()
 
     def _select_objs(self, boxes, regrs, clses):
         obj_clses = []

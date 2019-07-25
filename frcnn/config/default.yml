@@ -22,6 +22,6 @@ train:
   batch_size: 2
 
   checkpoint_dir: _ckpt
-  restore_ckpt: True
+  restore_ckpt: False
   model_file: model.h5
-  load_saved_model: True
+  load_saved_model: False

@@ -14,3 +14,4 @@ services:
     tty: true
     ports:
       - "8888:22"
+      - "36006:6006"
