@@ -10,7 +10,6 @@ from frcnn.util.anchor import make_anchors, transform, broadcast_iou, make_ancho
 import tensorflow as tf
 import os
 import numpy as np
-from tqdm import tqdm
 
 
 class Saver(tf.keras.models.Model):
@@ -238,9 +237,7 @@ class FasterRCNN:
     @tf.function
     def _train_step(self, x, rpn_ys, gt_boxes):
         with tf.GradientTape() as tape:
-            # tf.summary.trace_on(graph=True, profiler=True)
             rpn_objs, rpn_regrs, rpn_features = self.rpn(x)
-            # tf.summary.trace_export(name="rpn", step=self.optimizer.iterations, profiler_outdir=self.logdir)
             rpn_loss = self._rpn_loss(rpn_ys, rpn_objs, rpn_regrs)
             anchor_boxes = self._anchor_boxes_like(rpn_regrs)
             rpn_boxes = self._apply_regr(anchor_boxes, rpn_regrs)
@@ -261,8 +258,9 @@ class FasterRCNN:
             best_loss = -1
             for epoch in range(self.config['train']['epoch']):
                 for step, (x, (rpn_y, gt_boxes)) in enumerate(self.train_dataset):
-                    # print('>', step, end='')
+                    tf.summary.trace_on(graph=True, profiler=True)
                     loss = self._train_step(x, rpn_y, gt_boxes)
+                    tf.summary.trace_export(name="rpn", step=self.optimizer.iterations, profiler_outdir=self.logdir)
                     tf.summary.scalar('train_loss', loss, step=self.optimizer.iterations)
                     self.train_loss(loss)
                 print('Epoch {}: Loss: {}'.format(epoch, self.train_loss.result()))
