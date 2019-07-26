@@ -16,15 +16,16 @@ class RPN(tf.keras.models.Model):
             self.rpn_outs.append([rpn_conv, rpn_out_obj, rpn_out_regress])
 
     def call(self, x, **kwargs):
-        xs = self.backbone(x)
-        x_features = []
-        x_objs = []
-        x_regressions = []
-        for x, rpn_out in zip(xs, self.rpn_outs):
-            x_feature = rpn_out[0](x)
-            x_obj = rpn_out[1](x_feature)
-            x_regress = rpn_out[2](x_feature)
-            x_features.append(x_feature)
-            x_objs.append(x_obj)
-            x_regressions.append(x_regress)
-        return x_objs, x_regressions, x_features
+        with tf.name_scope('rpn'):
+            xs = self.backbone(x)
+            x_features = []
+            x_objs = []
+            x_regressions = []
+            for x, rpn_out in zip(xs, self.rpn_outs):
+                x_feature = rpn_out[0](x)
+                x_obj = rpn_out[1](x_feature)
+                x_regress = rpn_out[2](x_feature)
+                x_features.append(x_feature)
+                x_objs.append(x_obj)
+                x_regressions.append(x_regress)
+            return x_objs, x_regressions, x_features

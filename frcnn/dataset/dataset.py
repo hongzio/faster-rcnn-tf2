@@ -18,8 +18,9 @@ def fake_dataset():
     ])
 
     def _data_generator():
-        yield girl, girl_bb
-        yield horse, horse_bb
+        for _ in range(100):
+            yield girl, girl_bb
+            yield horse, horse_bb
 
     dataset = tf.data.Dataset.from_generator(_data_generator, (tf.int32, tf.float32), ((None, None, 3), (None, 5)))
     return dataset
@@ -67,7 +68,7 @@ def voc_dataset(data_path, file_name):
                 bboxes.append([y1/H, x1/W, y2/H, x2/W, cls_idx])
             yield img, np.array(bboxes)
     dataset = tf.data.Dataset.from_generator(_data_generator, (tf.int32, tf.float32), ((None, None, 3), (None, 5)))
-    dataset = dataset.prefetch(16)
+    # dataset = dataset.prefetch(4)
     return dataset
 #
 # if __name__ == '__main__':

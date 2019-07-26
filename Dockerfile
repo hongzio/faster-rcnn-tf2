@@ -17,6 +17,7 @@ RUN echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> /etc/profile
 RUN rm /etc/bash.bashrc
 EXPOSE 22
 EXPOSE 6006
+EXPOSE 6009
 
 ARG ROOT_PW
 RUN echo "root:$ROOT_PW" | chpasswd

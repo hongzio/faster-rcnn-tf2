@@ -39,7 +39,7 @@ def rpn_loss(rpn_y, rpn_pred_obj, rpn_pred_regr):
     rpn_obj_loss = tf.math.reduce_sum(rpn_obj_loss) / (tf.math.reduce_sum(train_mask)+eps)
 
 
-    regr_pred = tf.reshape(rpn_pred_regr, rpn_y[..., 2:].shape)
+    regr_pred = tf.reshape(rpn_pred_regr, tf.shape(rpn_y[..., 2:]))
     regr_diff = rpn_y[..., 2:] - regr_pred
     abs_regr_diff = tf.math.abs(regr_diff)
     smooth_l1_sign = tf.cast(tf.less(abs_regr_diff, 1.), tf.float32)

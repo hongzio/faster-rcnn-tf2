@@ -14,12 +14,12 @@ max_num_rois: 300
 
 
 train:
-  epoch: 200
+  epoch: 2
   lr: 1e-5
   max_iou: 0.7
   min_iou: 0.3
   max_num_gt_boxes: 100
-  batch_size: 2
+  batch_size: 1
 
   checkpoint_dir: _ckpt
   restore_ckpt: False

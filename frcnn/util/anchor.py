@@ -33,81 +33,83 @@ def broadcast_iou(ref_box, anchor_box):
     :param anchor_box: (..., N, 4(y1, x1, y2, x2))
     :return: (..., N)
     """
-    new_shape = tf.broadcast_dynamic_shape(tf.shape(ref_box), tf.shape(anchor_box))
-    ref_box = tf.broadcast_to(ref_box, new_shape)
-    anchor_box = tf.broadcast_to(anchor_box, new_shape)
+    with tf.name_scope('iou'):
+        new_shape = tf.broadcast_dynamic_shape(tf.shape(ref_box), tf.shape(anchor_box))
+        ref_box = tf.broadcast_to(ref_box, new_shape)
+        anchor_box = tf.broadcast_to(anchor_box, new_shape)
 
-    int_w = tf.minimum(ref_box[..., 3], anchor_box[..., 3]) - tf.maximum(ref_box[..., 1], anchor_box[..., 1])
-    int_w = tf.maximum(int_w, 0)
-    int_h = tf.minimum(ref_box[..., 2], anchor_box[..., 2]) - tf.maximum(ref_box[..., 0], anchor_box[..., 0])
-    int_h = tf.maximum(int_h, 0)
-    int_area = int_w * int_h
-    ref_box_area = (ref_box[..., 2] - ref_box[..., 0]) * (ref_box[..., 3] - ref_box[..., 1])
-    anchor_box_area = (anchor_box[..., 2] - anchor_box[..., 0]) * (anchor_box[..., 3] - anchor_box[..., 1])
-    return int_area / (ref_box_area + anchor_box_area - int_area + 1e-6)
+        int_w = tf.minimum(ref_box[..., 3], anchor_box[..., 3]) - tf.maximum(ref_box[..., 1], anchor_box[..., 1])
+        int_w = tf.maximum(int_w, 0)
+        int_h = tf.minimum(ref_box[..., 2], anchor_box[..., 2]) - tf.maximum(ref_box[..., 0], anchor_box[..., 0])
+        int_h = tf.maximum(int_h, 0)
+        int_area = int_w * int_h
+        ref_box_area = (ref_box[..., 2] - ref_box[..., 0]) * (ref_box[..., 3] - ref_box[..., 1])
+        anchor_box_area = (anchor_box[..., 2] - anchor_box[..., 0]) * (anchor_box[..., 3] - anchor_box[..., 1])
+        return int_area / (ref_box_area + anchor_box_area - int_area + 1e-6)
 
 
 
 def transform(bboxes, anchors, output_sizes, min_iou, max_iou, max_num_boxes=100):
-    # Padding bboxes
-    paddings = [[0, max_num_boxes - tf.shape(bboxes)[0]],
-                [0, 0]]  # up, *down*, left, right. 100 - The maximum number of objects
-    bboxes = tf.pad(bboxes, paddings)
-    ys = []
-    for output_size in output_sizes:
-        # anchors' coordinate
-        H = tf.cast(output_size[0], tf.float32)
-        W = tf.cast(output_size[1], tf.float32)
-        anchors_coord = make_anchor_coords(H, W, anchors)
-        anchors_coord_per_bbox = tf.expand_dims(anchors_coord, axis=-2)  # bboxes
-        anchors_coord_per_bbox = tf.tile(anchors_coord_per_bbox, [1, 1, 1, max_num_boxes, 1])
+    with tf.name_scope('transform'):
+        # Padding bboxes
+        paddings = [[0, max_num_boxes - tf.shape(bboxes)[0]],
+                    [0, 0]]  # up, *down*, left, right. 100 - The maximum number of objects
+        bboxes = tf.pad(bboxes, paddings)
+        ys = []
+        for output_size in output_sizes:
+            # anchors' coordinate
+            H = tf.cast(output_size[0], tf.float32)
+            W = tf.cast(output_size[1], tf.float32)
+            anchors_coord = make_anchor_coords(H, W, anchors)
+            anchors_coord_per_bbox = tf.expand_dims(anchors_coord, axis=-2)  # bboxes
+            anchors_coord_per_bbox = tf.tile(anchors_coord_per_bbox, [1, 1, 1, max_num_boxes, 1])
 
-        ious = broadcast_iou(bboxes[..., :4], anchors_coord_per_bbox)
+            ious = broadcast_iou(bboxes[..., :4], anchors_coord_per_bbox)
 
-        out_of_bound_y = tf.logical_or(anchors_coord_per_bbox[..., 0] < 0, anchors_coord_per_bbox[..., 2] > 1)
-        out_of_bound_x = tf.logical_or(anchors_coord_per_bbox[..., 1] < 0, anchors_coord_per_bbox[..., 3] > 1)
-        out_of_bound = tf.logical_or(out_of_bound_y, out_of_bound_x)
-        index = tf.where(out_of_bound)
-        ious = tf.tensor_scatter_nd_update(ious, index, tf.zeros(tf.shape(index)[0]))
+            out_of_bound_y = tf.logical_or(anchors_coord_per_bbox[..., 0] < 0, anchors_coord_per_bbox[..., 2] > 1)
+            out_of_bound_x = tf.logical_or(anchors_coord_per_bbox[..., 1] < 0, anchors_coord_per_bbox[..., 3] > 1)
+            out_of_bound = tf.logical_or(out_of_bound_y, out_of_bound_x)
+            index = tf.where(out_of_bound)
+            ious = tf.tensor_scatter_nd_update(ious, index, tf.zeros(tf.shape(index)[0]))
 
-        best_bbox_idx = tf.cast(tf.math.argmax(ious, axis=-1), tf.int32)
-        flat_best_bbox_rel_idx = tf.reshape(best_bbox_idx, [-1])
-        flat_base_idx = tf.range(tf.cast(H * W * len(anchors), tf.int32), dtype=tf.int32)
-        flat_best_bbox_abs_idx = tf.stack([flat_base_idx, flat_best_bbox_rel_idx], axis=1)
+            best_bbox_idx = tf.cast(tf.math.argmax(ious, axis=-1), tf.int32)
+            flat_best_bbox_rel_idx = tf.reshape(best_bbox_idx, [-1])
+            flat_base_idx = tf.range(tf.cast(H * W * len(anchors), tf.int32), dtype=tf.int32)
+            flat_best_bbox_abs_idx = tf.stack([flat_base_idx, flat_best_bbox_rel_idx], axis=1)
 
-        bboxes_per_grid = tf.broadcast_to(bboxes, (H, W, len(anchors), max_num_boxes, 5))
+            bboxes_per_grid = tf.broadcast_to(bboxes, (H, W, len(anchors), max_num_boxes, 5))
 
-        flat_bboxes = tf.reshape(bboxes_per_grid, (-1, max_num_boxes, 5))
-        flat_best_bboxes = tf.gather_nd(flat_bboxes, flat_best_bbox_abs_idx)
-        best_bboxes = tf.reshape(flat_best_bboxes, (H, W, len(anchors), 5))
+            flat_bboxes = tf.reshape(bboxes_per_grid, (-1, max_num_boxes, 5))
+            flat_best_bboxes = tf.gather_nd(flat_bboxes, flat_best_bbox_abs_idx)
+            best_bboxes = tf.reshape(flat_best_bboxes, (H, W, len(anchors), 5))
 
-        bbox_center_y = (best_bboxes[..., 0] + best_bboxes[..., 2]) / 2
-        bbox_center_x = (best_bboxes[..., 1] + best_bboxes[..., 3]) / 2
-        anchor_center_y = (anchors_coord[..., 0] + anchors_coord[..., 2]) / 2
-        anchor_center_x = (anchors_coord[..., 1] + anchors_coord[..., 3]) / 2
-        bbox_h = best_bboxes[..., 2] - best_bboxes[..., 0]
-        bbox_w = best_bboxes[..., 3] - best_bboxes[..., 1]
-        anchor_h = anchors_coord[..., 2] - anchors_coord[..., 0]
-        anchor_w = anchors_coord[..., 3] - anchors_coord[..., 1]
-        tx = (bbox_center_x - anchor_center_x) / anchor_w
-        ty = (bbox_center_y - anchor_center_y) / anchor_h
-        tw = tf.math.log(bbox_w / anchor_w)
-        th = tf.math.log(bbox_h / anchor_h)
-        regress = tf.stack([tx, ty, tw, th], axis=-1)
+            bbox_center_y = (best_bboxes[..., 0] + best_bboxes[..., 2]) / 2
+            bbox_center_x = (best_bboxes[..., 1] + best_bboxes[..., 3]) / 2
+            anchor_center_y = (anchors_coord[..., 0] + anchors_coord[..., 2]) / 2
+            anchor_center_x = (anchors_coord[..., 1] + anchors_coord[..., 3]) / 2
+            bbox_h = best_bboxes[..., 2] - best_bboxes[..., 0]
+            bbox_w = best_bboxes[..., 3] - best_bboxes[..., 1]
+            anchor_h = anchors_coord[..., 2] - anchors_coord[..., 0]
+            anchor_w = anchors_coord[..., 3] - anchors_coord[..., 1]
+            tx = (bbox_center_x - anchor_center_x) / anchor_w
+            ty = (bbox_center_y - anchor_center_y) / anchor_h
+            tw = tf.math.log(bbox_w / anchor_w)
+            th = tf.math.log(bbox_h / anchor_h)
+            regress = tf.stack([tx, ty, tw, th], axis=-1)
 
-        valid = tf.math.logical_or(ious < min_iou, max_iou < ious)
-        valid = tf.math.reduce_any(valid, axis=-1)
-        valid = tf.cast(valid, tf.float32)
-        valid = tf.expand_dims(valid, axis=-1)
+            valid = tf.math.logical_or(ious < min_iou, max_iou < ious)
+            valid = tf.math.reduce_any(valid, axis=-1)
+            valid = tf.cast(valid, tf.float32)
+            valid = tf.expand_dims(valid, axis=-1)
 
-        overlap = max_iou < ious
-        overlap = tf.math.reduce_any(overlap, axis=-1)
-        overlap = tf.cast(overlap, tf.float32)
-        overlap = tf.expand_dims(overlap, axis=-1)
+            overlap = max_iou < ious
+            overlap = tf.math.reduce_any(overlap, axis=-1)
+            overlap = tf.cast(overlap, tf.float32)
+            overlap = tf.expand_dims(overlap, axis=-1)
 
-        y = tf.concat([valid, overlap, regress], axis=-1)
-        ys.append(y)
-    return tuple(ys), bboxes
+            y = tf.concat([valid, overlap, regress], axis=-1)
+            ys.append(y)
+        return tuple(ys), bboxes
 
 
 def make_anchor_coords(H, W, anchors):
