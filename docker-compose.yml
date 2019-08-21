@@ -1,10 +1,18 @@
 version: '3'
 services:
-  train:
+  remote:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - "ROOT_PW=${ROOT_PW}"
     volumes:
       - .:/opt/project
+      - "${VOC_TRAIN_PATH}:/dataset/voc_train"
+      - "${VOC_TEST_PATH}:/dataset/voc_test"
     working_dir: /opt/project
     tty: true
+    ports:
+      - "8888:22"
+      - "36006:6006"
+      - "36009:6009"

@@ -1,6 +1,7 @@
 import tensorflow as tf
+import numpy as np
 import os
-
+from xml.etree import ElementTree as ET
 def fake_dataset():
     src_dir = os.path.dirname(os.path.abspath(__file__))
     girl = tf.image.decode_png(open(os.path.join(src_dir, 'girl.png'), 'rb').read(), channels=3)
@@ -17,8 +18,95 @@ def fake_dataset():
     ])
 
     def _data_generator():
-        yield girl, girl_bb
-        yield horse, horse_bb
+        for _ in range(100):
+            yield girl, girl_bb
+            yield horse, horse_bb
 
     dataset = tf.data.Dataset.from_generator(_data_generator, (tf.int32, tf.float32), ((None, None, 3), (None, 5)))
     return dataset
+
+def _load_id_list(path):
+    with open(path, 'r') as f:
+        ret = [line.rstrip('\n') for line in f]
+    return ret
+
+def _parse_classes(path):
+    files = os.listdir(path)
+    filtered = filter(lambda file: '_train.txt' in file or '_trainval.txt' in file or '_text.txt' in file, files)
+    return set(map(lambda file: '_'.join(file.split('_')[:-1]), filtered))
+
+def voc_dataset(data_path, file_name):
+    dirs = os.listdir(data_path)
+    years = list(filter(lambda dir: dir in ['VOC2007', 'VOC2012'], dirs))
+    year_id_list = []
+    class_list  = set()
+    for year in years:
+        id_list_file = os.path.join(data_path, year, 'ImageSets', 'Main', file_name)
+        id_list = _load_id_list(id_list_file)
+        class_list = class_list.union(_parse_classes(os.path.join(data_path, year, 'ImageSets', 'Main')))
+        year_id_list += [(year, id) for id in id_list]
+    class_list = sorted(class_list)
+    def _data_generator():
+        for year, id in year_id_list:
+            img_path = os.path.join(data_path, year, 'JPEGImages', '{}.jpg'.format(id))
+            anno_path = os.path.join(data_path, year, 'Annotations', '{}.xml'.format(id))
+            img = tf.image.decode_png(open(img_path, 'rb').read(), channels=3)
+
+            bboxes = []
+            anno = ET.parse(anno_path)
+            size = anno.getroot().find('size')
+            W = float(size.find('width').text)
+            H = float(size.find('height').text)
+            for obj in anno.getroot().findall('object'):
+                cls = obj.find('name').text
+                bbox = obj.find('bndbox')
+                y1 = float(bbox.find('ymin').text)
+                x1 = float(bbox.find('xmin').text)
+                y2 = float(bbox.find('ymax').text)
+                x2 = float(bbox.find('xmax').text)
+                cls_idx = class_list.index(cls)
+                bboxes.append([y1/H, x1/W, y2/H, x2/W, cls_idx])
+            yield img, np.array(bboxes)
+    dataset = tf.data.Dataset.from_generator(_data_generator, (tf.int32, tf.float32), ((None, None, 3), (None, 5)))
+    # dataset = dataset.prefetch(4)
+    return dataset
+#
+# if __name__ == '__main__':
+#     data_path = '/dataset/voc_train/'
+#     file_name = 'train.txt'
+#     dirs = os.listdir(data_path)
+#     years = list(filter(lambda dir: dir in ['VOC2007', 'VOC2012'], dirs))
+#     year_id_list = []
+#     class_list  = set()
+#     for year in years:
+#         id_list_file = os.path.join(data_path, year, 'ImageSets', 'Main', file_name)
+#         class_list = _parse_classes(os.path.join(data_path, year, 'ImageSets', 'Main'))
+#         id_list = _load_id_list(id_list_file)
+#         year_id_list += [(year, id) for id in id_list]
+#     class_list = sorted(class_list)
+#     def _data_generator():
+#         for year, id in year_id_list:
+#             img_path = os.path.join(data_path, year, 'JPEGImages', '{}.jpg'.format(id))
+#             anno_path = os.path.join(data_path, year, 'Annotations', '{}.xml'.format(id))
+#             img = tf.image.decode_png(open(img_path, 'rb').read(), channels=3)
+#
+#             bboxes = []
+#             anno = ET.parse(anno_path)
+#             size = anno.getroot().find('size')
+#             W = float(size.find('width').text)
+#             H = float(size.find('height').text)
+#             for obj in anno.getroot().findall('object'):
+#                 cls = obj.find('name').text
+#                 bbox = obj.find('bndbox')
+#                 y1 = float(bbox.find('ymin').text)
+#                 x1 = float(bbox.find('xmin').text)
+#                 y2 = float(bbox.find('ymax').text)
+#                 x2 = float(bbox.find('xmax').text)
+#                 cls_idx = class_list.index(cls)
+#                 bboxes.append([y1/H, x1/W, y2/H, x2/W, cls_idx])
+#             yield img, np.array(bboxes)
+#     get = _data_generator()
+#     a = next(get)
+#     a = next(get)
+#     a = next(get)
+#     a = next(get)

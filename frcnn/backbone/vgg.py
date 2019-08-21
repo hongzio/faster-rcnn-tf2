@@ -42,34 +42,35 @@ class VGG(tf.keras.layers.Layer):
 
 
     def call(self, x, **kwargs):
-        x = self.block1_conv1(x)
-        x = self.block1_conv2(x)
-        x = self.block1_pool(x)
+        with tf.name_scope('backbone'):
+            x = self.block1_conv1(x)
+            x = self.block1_conv2(x)
+            x = self.block1_pool(x)
 
-        x = self.block2_conv1(x)
-        x = self.block2_conv2(x)
-        x = C2 = self.block2_pool(x)
+            x = self.block2_conv1(x)
+            x = self.block2_conv2(x)
+            x = C2 = self.block2_pool(x)
 
-        x = self.block3_conv1(x)
-        x = self.block3_conv2(x)
-        x = self.block3_conv3(x)
-        x = C3 = self.block3_pool(x)
+            x = self.block3_conv1(x)
+            x = self.block3_conv2(x)
+            x = self.block3_conv3(x)
+            x = C3 = self.block3_pool(x)
 
-        x = self.block4_conv1(x)
-        x = self.block4_conv2(x)
-        x = self.block4_conv3(x)
-        x = C4 = self.block4_pool(x)
+            x = self.block4_conv1(x)
+            x = self.block4_conv2(x)
+            x = self.block4_conv3(x)
+            x = C4 = self.block4_pool(x)
 
-        x = self.block5_conv1(x)
-        x = self.block5_conv2(x)
-        x = self.block5_conv3(x)
-        C5 = self.block5_pool(x)
+            x = self.block5_conv1(x)
+            x = self.block5_conv2(x)
+            x = self.block5_conv3(x)
+            C5 = self.block5_pool(x)
 
-        P5 = self.reduce5(C5)
-        P4 = self.add4([self.up5(P5), self.reduce4(C4)])
-        P3 = self.add3([self.up4(P4), self.reduce3(C3)])
-        P2 = self.add2([self.up3(P3), self.reduce2(C2)])
-        return [P2, P3, P4, P5]
+            P5 = self.reduce5(C5)
+            P4 = self.add4([self.up5(P5), self.reduce4(C4)])
+            P3 = self.add3([self.up4(P4), self.reduce3(C3)])
+            P2 = self.add2([self.up3(P3), self.reduce2(C2)])
+            return [P2, P3, P4, P5]
 
     def calc_output_size(self, input_shape):
         return [input_shape / 4, input_shape / 8, input_shape / 16, input_shape / 32]
