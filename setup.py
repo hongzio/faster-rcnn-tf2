@@ -22,7 +22,7 @@ setup(name='faster-rcnn',
 
       setup_requires=[],
 
-      install_requires=['tensorflow-gpu==2.4.0', 'PyYAML>=5.4'],
+      install_requires=['tensorflow-gpu==2.12.0', 'PyYAML>=5.4'],
 
       include_package_data=True
       )
